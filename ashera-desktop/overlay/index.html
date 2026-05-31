@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ashera Live Brif</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: transparent;
+  font-family: 'Syne', sans-serif;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.overlay {
+  width: 360px;
+  background: rgba(15, 15, 18, 0.92);
+  border-radius: 14px;
+  border: 0.5px solid rgba(255,255,255,0.1);
+  overflow: hidden;
+}
+.overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.07);
+}
+.overlay-logo { display: flex; align-items: center; gap: 6px; }
+.overlay-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #1D9E75;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.overlay-name {
+  font-size: 11px; font-weight: 500;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: 'DM Mono', monospace;
+}
+.overlay-timer { font-size: 11px; color: rgba(255,255,255,0.3); font-family: 'DM Mono', monospace; }
+.overlay-close {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: none;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  -webkit-app-region: no-drag;
+}
+.phase-bar { display: flex; padding: 6px 12px; gap: 4px; }
+.phase-seg { height: 2px; flex: 1; border-radius: 1px; background: rgba(255,255,255,0.1); }
+.phase-seg.active { background: #1D9E75; }
+.phase-seg.done { background: rgba(29,158,117,0.4); }
+.alert-section { padding: 8px 12px; display: flex; flex-direction: column; gap: 5px; }
+.alert-chip {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 9px; border-radius: 6px;
+  font-size: 12px; font-weight: 500;
+}
+.alert-chip.price { background: rgba(186,117,23,0.15); border: 0.5px solid rgba(186,117,23,0.3); color: #FAC775; }
+.alert-chip.tech  { background: rgba(83,74,183,0.15);  border: 0.5px solid rgba(83,74,183,0.3);  color: #AFA9EC; }
+.alert-chip.hot   { background: rgba(29,158,117,0.12); border: 0.5px solid rgba(29,158,117,0.25); color: #5DCAA5; }
+.alert-chip.neutral { background: rgba(255,255,255,0.05); border: 0.5px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); }
+.divider { height: 0.5px; background: rgba(255,255,255,0.06); margin: 0 12px; }
+.brif-section { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.brif-item { display: flex; gap: 10px; align-items: flex-start; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+.brif-item.old { opacity: 0.45; }
+.brif-tag {
+  font-size: 9px; font-family: 'DM Mono', monospace;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 4px;
+  flex-shrink: 0; margin-top: 1px; font-weight: 500;
+}
+.brif-tag.aksiyon { background: rgba(29,158,117,0.2); color: #5DCAA5; }
+.brif-tag.dikkat  { background: rgba(186,117,23,0.2); color: #FAC775; }
+.brif-tag.bilgi   { background: rgba(83,74,183,0.2);  color: #AFA9EC; }
+.new-badge {
+  display: inline-block; font-size: 9px;
+  font-family: 'DM Mono', monospace;
+  padding: 1px 5px; border-radius: 3px;
+  background: rgba(29,158,117,0.3); color: #5DCAA5;
+  vertical-align: middle; margin-left: 4px;
+}
+.brif-text { font-size: 12.5px; color: rgba(255,255,255,0.82); line-height: 1.5; }
+.brif-text strong { color: #fff; font-weight: 500; }
+.overlay-footer {
+  padding: 7px 12px;
+  border-top: 0.5px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.footer-hint { font-size: 10px; color: rgba(255,255,255,0.25); font-family: 'DM Mono', monospace; }
+.footer-score { display: flex; align-items: center; gap: 5px; }
+.score-label { font-size: 10px; color: rgba(255,255,255,0.3); font-family: 'DM Mono', monospace; }
+.score-val { font-size: 13px; font-weight: 600; color: #5DCAA5; }
+.connecting-state {
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255,255,255,0.3);
+  font-family: 'DM Mono', monospace;
+}
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay">
+  <div class="overlay-header">
+    <div class="overlay-logo">
+      <div class="overlay-dot" id="status-dot"></div>
+      <img src="../assets/logo.png" style="width:14px;height:14px;object-fit:contain;filter:invert(1);opacity:0.6;margin-right:2px;" alt="">
+      <span class="overlay-name">Ashera</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="overlay-timer" id="timer">00:00</span>
+      <button class="overlay-close" id="close-btn" onclick="window.overlayAPI.close()">✕</button>
+    </div>
+  </div>
+
+  <div class="phase-bar" id="phase-bar">
+    <div class="phase-seg" id="p0"></div>
+    <div class="phase-seg" id="p1"></div>
+    <div class="phase-seg" id="p2"></div>
+    <div class="phase-seg" id="p3"></div>
+    <div class="phase-seg" id="p4"></div>
+  </div>
+
+  <div id="main-content">
+    <div class="connecting-state" id="connecting">Bağlanıyor...</div>
+  </div>
+
+  <div class="overlay-footer" id="footer" style="display:none;">
+    <span class="footer-hint" id="last-update">—</span>
+    <div class="footer-score">
+      <span class="score-label">deal skoru</span>
+      <span class="score-val" id="deal-score">—</span>
+    </div>
+  </div>
+</div>
+
+<script src="overlay.js"></script>
+</body>
+</html>

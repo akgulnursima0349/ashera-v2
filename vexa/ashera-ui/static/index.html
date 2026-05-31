@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ashera Transkript</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+
+    body {
+      background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+      min-height: 100vh;
+    }
+
+    .glass {
+      background: rgba(255,255,255,0.07);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .glass-dark {
+      background: rgba(0,0,0,0.25);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      transition: all 0.2s;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(99,102,241,0.4); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      transition: all 0.2s;
+    }
+    .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(239,68,68,0.4); }
+    .btn-danger:active { transform: translateY(0); }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+
+    .step-circle {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 600;
+      transition: all 0.3s;
+    }
+    .step-active  { background: linear-gradient(135deg,#6366f1,#8b5cf6); color: white; }
+    .step-done    { background: #22c55e; color: white; }
+    .step-pending { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); }
+
+    .step-line { flex: 1; height: 2px; background: rgba(255,255,255,0.1); margin: 0 8px; }
+    .step-line.done { background: #22c55e; }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    input[type=text], input[type=password], textarea {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: white;
+      border-radius: 10px;
+      padding: 12px 16px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type=text]:focus, input[type=password]:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+    input::placeholder { color: rgba(255,255,255,0.3); }
+
+    .key-box {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(99,102,241,0.4);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #a5b4fc;
+      word-break: break-all;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .key-box:hover { background: rgba(99,102,241,0.1); }
+
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 999px;
+      font-size: 12px; font-weight: 600;
+    }
+    .status-joining  { background: rgba(234,179,8,0.15);  color: #fbbf24; border: 1px solid rgba(234,179,8,0.3); }
+    .status-active   { background: rgba(34,197,94,0.15);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+    .status-leaving  { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .status-other    { background: rgba(148,163,184,0.15);color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }
+
+    .pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .segment-row {
+      border-left: 3px solid #6366f1;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 0 8px 8px 0;
+    }
+
+    .fade-in { animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+  </style>
+</head>
+
+<body class="flex items-center justify-center min-h-screen p-4">
+
+  <!-- Ana Kart -->
+  <div class="glass rounded-2xl p-8 w-full max-w-lg shadow-2xl fade-in">
+
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3"
+           style="background: linear-gradient(135deg,#6366f1,#8b5cf6)">
+        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold text-white">Ashera Transkript</h1>
+      <p class="text-slate-400 text-sm mt-1">Google Meet toplantılarınızı otomatik transkribe edin</p>
+    </div>
+
+    <!-- Adım göstergesi -->
+    <div class="flex items-center mb-8" id="stepIndicator">
+      <div class="step-circle step-active" id="sc1">1</div>
+      <div class="step-line" id="sl1"></div>
+      <div class="step-circle step-pending" id="sc2">2</div>
+      <div class="step-line" id="sl2"></div>
+      <div class="step-circle step-pending" id="sc3">3</div>
+      <div class="step-line" id="sl3"></div>
+      <div class="step-circle step-pending" id="sc4">4</div>
+    </div>
+
+    <!-- ─── SAYFA 1: API Anahtarı ─────────────────────────────────── -->
+    <div class="page active" id="page1">
+      <h2 class="text-lg font-semibold text-white mb-1">API Anahtarınız</h2>
+      <p class="text-slate-400 text-sm mb-6">
+        Sistemi kullanmak için bir API anahtarına ihtiyacınız var.
+        Daha önce aldıysanız yapıştırın, yoksa yeni bir tane alın.
+      </p>
+
+      <!-- Mevcut anahtar göster -->
+      <div id="existingKeyBlock" class="hidden mb-4">
+        <label class="text-slate-300 text-sm font-medium mb-2 block">Kayıtlı Anahtarınız</label>
+        <div class="key-box mb-2" id="savedKeyDisplay" onclick="copyKey()"></div>
+        <p class="text-slate-500 text-xs">Tıklayarak kopyalayabilirsiniz</p>
+      </div>
+
+      <!-- Anahtar girişi -->
+      <div id="keyInputBlock" class="mb-4">
+        <label class="text-slate-300 text-sm font-medium mb-2 block">API Anahtarı Yapıştır</label>
+        <input type="password" id="apiKeyInput" placeholder="api_key_buraya_yapıştırın" />
+        <p class="text-slate-500 text-xs mt-2">Anahtarınız bu cihazda güvenle saklanır.</p>
+      </div>
+
+      <!-- Hatalar -->
+      <div id="keyError" class="hidden glass-dark rounded-lg p-3 mb-4 text-red-400 text-sm"></div>
+
+      <!-- Butonlar -->
+      <div class="flex flex-col gap-3">
+        <button onclick="useKey()" class="btn-primary text-white font-semibold py-3 px-6 rounded-xl w-full">
+          Devam Et →
+        </button>
+
+        <div class="flex items-center gap-3">
+          <div class="flex-1 h-px bg-white/10"></div>
+          <span class="text-slate-500 text-xs">ya da</span>
+          <div class="flex-1 h-px bg-white/10"></div>
+        </div>
+
+        <button onclick="createNewKey()" id="createKeyBtn" class="btn-secondary text-white font-medium py-3 px-6 rounded-xl w-full">
+          <span id="createKeyBtnText">✨ Yeni Anahtar Al (Ücretsiz)</span>
+        </button>
+      </div>
+
+      <!-- Yeni anahtar oluşturuldu -->
+      <div id="newKeyResult" class="hidden mt-4 glass-dark rounded-xl p-4">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-2 h-2 rounded-full bg-green-400"></div>
+          <span class="text-green-400 text-sm font-medium">Anahtar başarıyla oluşturuldu!</span>
+        </div>
+        <div class="key-box" id="newKeyDisplay" onclick="copyNewKey()"></div>
+        <p class="text-slate-500 text-xs mt-2">⚠️ Bu anahtarı kaydedin — bir daha gösterilmeyecek.<br>Tıklayarak kopyalayabilirsiniz.</p>
+      </div>
+    </div>
+
+    <!-- ─── SAYFA 2: Toplantı ─────────────────────────────────────── -->
+    <div class="page" id="page2">
+      <h2 class="text-lg font-semibold text-white mb-1">Toplantıya Katıl</h2>
+      <p class="text-slate-400 text-sm mb-6">
+        Google Meet toplantı linkini yapıştırın ve botu gönderin.
+      </p>
+
+      <div class="mb-4">
+        <label class="text-slate-300 text-sm font-medium mb-2 block">Google Meet Linki</label>
+        <input type="text" id="meetLinkInput"
+          placeholder="https://meet.google.com/abc-defg-hij"
+          oninput="validateMeetLink()" />
+        <p class="text-slate-500 text-xs mt-2">Toplantı linkini veya sadece kodu yapıştırabilirsiniz.</p>
+      </div>
+
+      <div class="mb-6">
+        <label class="text-slate-300 text-sm font-medium mb-2 block">Bot Adı</label>
+        <input type="text" id="botNameInput" value="Transkript Bot" placeholder="Transkript Bot" />
+      </div>
+
+      <div id="meetError" class="hidden glass-dark rounded-lg p-3 mb-4 text-red-400 text-sm"></div>
+
+      <div class="flex gap-3">
+        <button onclick="goToPage(1)" class="btn-secondary text-white font-medium py-3 px-5 rounded-xl">
+          ← Geri
+        </button>
+        <button onclick="sendBot()" id="sendBotBtn"
+          class="btn-primary text-white font-semibold py-3 px-6 rounded-xl flex-1">
+          <span id="sendBotBtnText">🤖 Botu Gönder</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ─── SAYFA 3: Aktif Bot ────────────────────────────────────── -->
+    <div class="page" id="page3">
+      <h2 class="text-lg font-semibold text-white mb-1">Bot Aktif</h2>
+      <p class="text-slate-400 text-sm mb-6">
+        Bot toplantıdayken konuşabilirsiniz. Bitince botu çıkartın.
+      </p>
+
+      <!-- Durum kartı -->
+      <div class="glass-dark rounded-xl p-5 mb-6">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <p class="text-slate-400 text-xs mb-1">Toplantı</p>
+            <p class="text-white font-mono font-semibold text-sm" id="activeMeetingId">—</p>
+          </div>
+          <div id="botStatusBadge" class="status-badge status-joining">
+            <span class="pulse">●</span> Katılınıyor
+          </div>
+        </div>
+        <div class="flex justify-between">
+          <div>
+            <p class="text-slate-400 text-xs mb-1">Bot Adı</p>
+            <p class="text-white text-sm" id="activeBotName">—</p>
+          </div>
+          <div>
+            <p class="text-slate-400 text-xs mb-1">Süre</p>
+            <p class="text-white font-mono text-sm" id="elapsedTime">00:00</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Uyarı -->
+      <div class="glass-dark rounded-xl p-4 mb-6 flex gap-3">
+        <span class="text-yellow-400 text-xl">ℹ️</span>
+        <p class="text-slate-400 text-sm">
+          Google Meet ekranında <strong class="text-white">"Transkript Bot katılmak istiyor"</strong>
+          bildirimi çıkacak — <strong class="text-yellow-300">Kabul et</strong> butonuna tıklayın.
+        </p>
+      </div>
+
+      <button onclick="stopBotAndTranscript()" id="stopBotBtn"
+        class="btn-danger text-white font-semibold py-3 px-6 rounded-xl w-full">
+        ⏹ Botu Çıkart ve Transkripti Al
+      </button>
+    </div>
+
+    <!-- ─── SAYFA 4: Transkript ───────────────────────────────────── -->
+    <div class="page" id="page4">
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <h2 class="text-lg font-semibold text-white">Transkript</h2>
+          <p class="text-slate-400 text-sm" id="transcriptMeta">—</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="copyTranscript()" title="Kopyala"
+            class="btn-secondary text-white text-sm py-2 px-3 rounded-lg">📋</button>
+          <button onclick="downloadTranscript()" title="İndir"
+            class="btn-secondary text-white text-sm py-2 px-3 rounded-lg">⬇️</button>
+        </div>
+      </div>
+
+      <!-- Segment listesi -->
+      <div id="transcriptBody" class="overflow-y-auto max-h-72 mb-6 pr-1">
+        <p class="text-slate-500 text-sm text-center py-6">Transkript yükleniyor...</p>
+      </div>
+
+      <!-- Boş durum -->
+      <div id="emptyTranscript" class="hidden text-center py-6">
+        <p class="text-4xl mb-3">🤔</p>
+        <p class="text-slate-400">Transkriptte henüz metin yok.</p>
+        <p class="text-slate-500 text-sm mt-1">Bot toplantıda yeterince ses almamış olabilir.</p>
+      </div>
+
+      <button onclick="resetApp()"
+        class="btn-secondary text-white font-medium py-3 px-6 rounded-xl w-full">
+        🔄 Yeni Toplantı Başlat
+      </button>
+    </div>
+
+  </div><!-- /card -->
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 glass-dark rounded-xl px-5 py-3
+       text-white text-sm font-medium shadow-xl transition-all duration-300 opacity-0 pointer-events-none z-50">
+  </div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+const state = {
+  apiKey:     localStorage.getItem('ashera_api_key') || '',
+  meetingId:  '',
+  botName:    '',
+  startTime:  null,
+  timerInt:   null,
+  pollInt:    null,
+  transcript: [],
+};
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+window.onload = () => {
+  if (state.apiKey) {
+    document.getElementById('existingKeyBlock').classList.remove('hidden');
+    document.getElementById('savedKeyDisplay').textContent = maskKey(state.apiKey);
+    document.getElementById('keyInputBlock').classList.add('hidden');
+  }
+};
+
+// ─── Adım Yönetimi ───────────────────────────────────────────────────────────
+function goToPage(n) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page' + n).classList.add('active');
+  updateStepIndicator(n);
+}
+
+function updateStepIndicator(active) {
+  for (let i = 1; i <= 4; i++) {
+    const c = document.getElementById('sc' + i);
+    c.className = 'step-circle ' + (i < active ? 'step-done' : i === active ? 'step-active' : 'step-pending');
+    c.textContent = i < active ? '✓' : i;
+  }
+  for (let i = 1; i <= 3; i++) {
+    const l = document.getElementById('sl' + i);
+    l.className = 'step-line' + (i < active ? ' done' : '');
+  }
+}
+
+// ─── Sayfa 1 — API Key ───────────────────────────────────────────────────────
+function maskKey(k) {
+  if (!k || k.length < 8) return k;
+  return k.slice(0, 6) + '••••••••••••••••' + k.slice(-4);
+}
+
+async function createNewKey() {
+  const btn  = document.getElementById('createKeyBtn');
+  const txt  = document.getElementById('createKeyBtnText');
+  const res  = document.getElementById('newKeyResult');
+  const disp = document.getElementById('newKeyDisplay');
+  const err  = document.getElementById('keyError');
+
+  btn.disabled = true;
+  txt.textContent = '⏳ Oluşturuluyor...';
+  err.classList.add('hidden');
+
+  try {
+    const r = await fetch('/api/key', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Anahtar oluşturulamadı');
+
+    state.apiKey = d.api_key;
+    localStorage.setItem('ashera_api_key', state.apiKey);
+
+    disp.textContent = state.apiKey;
+    res.classList.remove('hidden');
+    txt.textContent = '✅ Oluşturuldu';
+    showToast('API anahtarı oluşturuldu!');
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.remove('hidden');
+    txt.textContent = '✨ Yeni Anahtar Al (Ücretsiz)';
+    btn.disabled = false;
+  }
+}
+
+function copyNewKey() {
+  navigator.clipboard.writeText(state.apiKey);
+  showToast('Anahtar kopyalandı!');
+}
+
+function copyKey() {
+  navigator.clipboard.writeText(state.apiKey);
+  showToast('Kopyalandı!');
+}
+
+function useKey() {
+  const input = document.getElementById('apiKeyInput').value.trim();
+  const err   = document.getElementById('keyError');
+  err.classList.add('hidden');
+
+  const key = input || state.apiKey;
+  if (!key) {
+    err.textContent = 'Lütfen bir API anahtarı girin veya yeni bir tane oluşturun.';
+    err.classList.remove('hidden');
+    return;
+  }
+
+  state.apiKey = key;
+  localStorage.setItem('ashera_api_key', key);
+  goToPage(2);
+}
+
+// ─── Sayfa 2 — Toplantı ──────────────────────────────────────────────────────
+function extractMeetingId(input) {
+  input = input.trim();
+  // Sadece kod: abc-defg-hij
+  if (/^[a-z]{3}-[a-z]{4}-[a-z]{3}$/i.test(input)) return input.toLowerCase();
+  // Link: https://meet.google.com/abc-defg-hij
+  const m = input.match(/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i);
+  if (m) return m[1].toLowerCase();
+  return null;
+}
+
+function validateMeetLink() {
+  const val = document.getElementById('meetLinkInput').value;
+  const err = document.getElementById('meetError');
+  if (val && !extractMeetingId(val)) {
+    err.textContent = 'Geçersiz Google Meet linki. Örnek: https://meet.google.com/abc-defg-hij';
+    err.classList.remove('hidden');
+  } else {
+    err.classList.add('hidden');
+  }
+}
+
+async function sendBot() {
+  const linkVal = document.getElementById('meetLinkInput').value.trim();
+  const botName = document.getElementById('botNameInput').value.trim() || 'Transkript Bot';
+  const btn     = document.getElementById('sendBotBtn');
+  const txt     = document.getElementById('sendBotBtnText');
+  const err     = document.getElementById('meetError');
+
+  const meetId  = extractMeetingId(linkVal);
+  if (!meetId) {
+    err.textContent = 'Geçerli bir Google Meet linki veya kodu girin.';
+    err.classList.remove('hidden');
+    return;
+  }
+  err.classList.add('hidden');
+
+  btn.disabled = true;
+  txt.textContent = '⏳ Bot gönderiliyor...';
+
+  try {
+    const r = await fetch('/api/bots', {
+      method:  'POST',
+      headers: { 'X-API-Key': state.apiKey, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        platform:           'google_meet',
+        native_meeting_id:  meetId,
+        language:           'en',
+        bot_name:           botName,
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+
+    state.meetingId  = meetId;
+    state.botName    = botName;
+    state.startTime  = Date.now();
+
+    document.getElementById('activeMeetingId').textContent = meetId;
+    document.getElementById('activeBotName').textContent   = botName;
+    startTimer();
+    startStatusPoll();
+    goToPage(3);
+    showToast('Bot gönderildi! Google Meet\'te kabul edin.');
+  } catch (e) {
+    err.textContent = 'Hata: ' + e.message;
+    err.classList.remove('hidden');
+    txt.textContent = '🤖 Botu Gönder';
+    btn.disabled = false;
+  }
+}
+
+// ─── Sayfa 3 — Aktif Bot ─────────────────────────────────────────────────────
+function startTimer() {
+  clearInterval(state.timerInt);
+  state.timerInt = setInterval(() => {
+    const s  = Math.floor((Date.now() - state.startTime) / 1000);
+    const mm = String(Math.floor(s / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    document.getElementById('elapsedTime').textContent = mm + ':' + ss;
+  }, 1000);
+}
+
+function startStatusPoll() {
+  clearInterval(state.pollInt);
+  state.pollInt = setInterval(async () => {
+    try {
+      const r = await fetch('/api/bots/status', {
+        headers: { 'X-API-Key': state.apiKey }
+      });
+      const data = await r.json();
+      const bots = Array.isArray(data) ? data : (data.bots || []);
+      const bot  = bots.find(b => b.native_meeting_id === state.meetingId
+                              || b.meeting_id === state.meetingId);
+
+      updateBotStatus(bot ? bot.status : 'unknown');
+    } catch (_) {}
+  }, 5000);
+}
+
+function updateBotStatus(status) {
+  const badge = document.getElementById('botStatusBadge');
+  const map = {
+    requested:  ['status-joining', '⏳ Bekleniyor'],
+    joining:    ['status-joining', '🔄 Katılınıyor'],
+    joined:     ['status-active',  '🟢 Aktif'],
+    recording:  ['status-active',  '🔴 Kayıt Yapıyor'],
+    leaving:    ['status-leaving', '👋 Ayrılıyor'],
+    completed:  ['status-other',   '✅ Tamamlandı'],
+    failed:     ['status-leaving', '❌ Başarısız'],
+  };
+  const [cls, label] = map[status] || ['status-other', '⚪ ' + status];
+  badge.className = 'status-badge ' + cls;
+  badge.innerHTML = (cls === 'status-active' ? '<span class="pulse">●</span> ' : '') + label;
+}
+
+async function stopBotAndTranscript() {
+  const btn = document.getElementById('stopBotBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Durduruluyor...';
+
+  clearInterval(state.timerInt);
+  clearInterval(state.pollInt);
+
+  try {
+    await fetch(`/api/bots/google_meet/${state.meetingId}`, {
+      method:  'DELETE',
+      headers: { 'X-API-Key': state.apiKey }
+    });
+  } catch (_) {}
+
+  // Biraz bekle (bot kapandıktan sonra transkript yazmaya devam edebilir)
+  btn.textContent = '⏳ Transkript alınıyor...';
+  await sleep(3000);
+
+  await loadTranscript();
+}
+
+// ─── Sayfa 4 — Transkript ────────────────────────────────────────────────────
+async function loadTranscript() {
+  try {
+    const r = await fetch(`/api/transcripts/google_meet/${state.meetingId}`, {
+      headers: { 'X-API-Key': state.apiKey }
+    });
+    const d = await r.json();
+    state.transcript = d.segments || [];
+    renderTranscript(d);
+    goToPage(4);
+  } catch (e) {
+    showToast('Transkript alınamadı: ' + e.message, 'error');
+    document.getElementById('stopBotBtn').disabled = false;
+    document.getElementById('stopBotBtn').textContent = '⏹ Botu Çıkart ve Transkripti Al';
+  }
+}
+
+function renderTranscript(data) {
+  const body  = document.getElementById('transcriptBody');
+  const empty = document.getElementById('emptyTranscript');
+  const meta  = document.getElementById('transcriptMeta');
+  const segs  = data.segments || [];
+
+  // Meta bilgi
+  const dur = data.end_time && data.start_time
+    ? Math.round((new Date(data.end_time) - new Date(data.start_time)) / 60000)
+    : '?';
+  meta.textContent = `${segs.length} segment · ${dur} dakika · ${state.meetingId}`;
+
+  if (!segs.length) {
+    body.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  body.innerHTML = segs.map(s => {
+    const ts = formatTime(s.start || 0);
+    const speaker = s.speaker || 'Konuşmacı';
+    const text    = (s.text || '').trim();
+    return `
+      <div class="segment-row">
+        <div class="flex justify-between items-center mb-1">
+          <span class="text-indigo-300 text-xs font-semibold">${escHtml(speaker)}</span>
+          <span class="text-slate-500 text-xs font-mono">${ts}</span>
+        </div>
+        <p class="text-white text-sm leading-relaxed">${escHtml(text)}</p>
+      </div>`;
+  }).join('');
+}
+
+function copyTranscript() {
+  const lines = state.transcript.map(s =>
+    `[${formatTime(s.start||0)}] ${s.speaker||'Konuşmacı'}: ${(s.text||'').trim()}`
+  ).join('\n');
+  navigator.clipboard.writeText(lines);
+  showToast('Transkript kopyalandı!');
+}
+
+function downloadTranscript() {
+  const lines = state.transcript.map(s =>
+    `[${formatTime(s.start||0)}] ${s.speaker||'Konuşmacı'}: ${(s.text||'').trim()}`
+  ).join('\n');
+  const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `transkript-${state.meetingId}.txt`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function resetApp() {
+  state.meetingId = '';
+  state.transcript = [];
+  clearInterval(state.timerInt);
+  clearInterval(state.pollInt);
+  document.getElementById('meetLinkInput').value = '';
+  document.getElementById('sendBotBtn').disabled = false;
+  document.getElementById('sendBotBtnText').textContent = '🤖 Botu Gönder';
+  document.getElementById('stopBotBtn').disabled = false;
+  document.getElementById('stopBotBtn').textContent = '⏹ Botu Çıkart ve Transkripti Al';
+  goToPage(2);
+}
+
+// ─── Yardımcılar ─────────────────────────────────────────────────────────────
+function formatTime(secs) {
+  const s  = Math.floor(secs);
+  const mm = String(Math.floor(s / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return mm + ':' + ss;
+}
+
+function escHtml(t) {
+  return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showToast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = type === 'error'
+    ? 'rgba(220,38,38,0.9)'
+    : 'rgba(99,102,241,0.9)';
+  t.style.opacity = '1';
+  setTimeout(() => { t.style.opacity = '0'; }, 2800);
+}
+</script>
+</body>
+</html>

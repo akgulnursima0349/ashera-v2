@@ -1,0 +1,23 @@
+appId: net.ashera.desktop
+productName: Ashera
+directories:
+  output: dist
+files:
+  - main.js
+  - preload.js
+  - overlay-preload.js
+  - app/**
+  - overlay/**
+  - services/**
+  - assets/**
+  - node_modules/**
+mac:
+  category: public.app-category.business
+  icon: assets/logo.png
+  target: dmg
+win:
+  icon: assets/logo.png
+  target: nsis
+linux:
+  icon: assets/logo.png
+  target: AppImage

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:/project/ashera-v2/ashera-desktop\" && npm run build 2>&1)",
+      "Bash(ssh:*)",
+      "Bash(cd \"C:/project/ashera-v2\" && git init && git remote add origin https://github.com/akgulnursima0349/ashera-v2.git 2>&1)",
+      "Bash(head:*)"
+    ]
+  }
+}

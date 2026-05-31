@@ -1,0 +1,19 @@
+{
+  "name": "ashera-slack-bot",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node main.js",
+    "dev": "node --watch main.js"
+  },
+  "dependencies": {
+    "@slack/bolt": "^3.18.0",
+    "@slack/web-api": "^7.3.0",
+    "@anthropic-ai/sdk": "^0.24.0",
+    "fastify": "^4.27.0",
+    "pg": "^8.11.0",
+    "dotenv": "^16.4.0",
+    "googleapis": "^140.0.0",
+    "@hubspot/api-client": "^11.0.0"
+  }
+}

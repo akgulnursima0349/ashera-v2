@@ -1,0 +1,187 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: vexa-postgres
+    environment:
+      POSTGRES_DB: vexa
+      POSTGRES_USER: vexa
+      POSTGRES_PASSWORD: vexa-secure-password-change-this
+    volumes:
+      - vexa_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+    networks:
+      - vexa-network
+
+  # Redis — dışarıya açık (hem vexa-lite hem realtime-transcriber kullanır)
+  redis:
+    image: redis:7-alpine
+    container_name: ashera-redis
+    restart: unless-stopped
+    networks:
+      - vexa-network
+
+  # Ashera Realtime Transcriber — WhisperLive'ı bypass eder
+  # AssemblyAI Real-time WebSocket API kullanır (~1-2s gecikme)
+  realtime-transcriber:
+    build:
+      context: ./realtime-transcriber
+      dockerfile: Dockerfile
+    container_name: ashera-realtime
+    ports:
+      - "9090:9090"
+    environment:
+      ASSEMBLYAI_API_KEY: ${ASSEMBLYAI_API_KEY}
+      REDIS_URL: redis://vexa-lite:6379/0
+      REDIS_STREAM_KEY: transcription_segments
+      REDIS_SPEAKER_EVENTS_RELATIVE_STREAM_KEY: speaker_events_relative
+    restart: unless-stopped
+    networks:
+      - vexa-network
+
+  # Vexa Lite Service
+  vexa-lite:
+    image: vexaai/vexa-lite:latest
+    container_name: vexa-lite
+    ports:
+      - "8056:8056"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./vexa-config/vexa.conf:/etc/supervisor/conf.d/vexa.conf:ro
+    environment:
+      # Database
+      DATABASE_URL: postgresql://vexa:vexa-secure-password-change-this@postgres:5432/vexa
+
+      # Redis — dış Redis kullan (realtime-transcriber ile ortak)
+      REDIS_URL: redis://redis:6379/0
+      REDIS_STREAM_URL: redis://redis:6379/0
+
+      # Admin Token
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-your-super-secret-admin-token-here}
+
+      # Transkripsiyon: realtime-transcriber'a yönlendir
+      # Bot'lar artık WhisperLive yerine bizim servisimize bağlanır
+      WHISPER_LIVE_URL: ws://host.docker.internal:9090
+
+      # Yerel Whisper modelini kapat (zaten kullanmıyoruz)
+      LOCAL_TRANSCRIPTION_ENABLED: "false"
+      TRANSCRIPTION_MODE: remote
+
+      # Eski proxy ayarları (WhisperLive'ın remote backend'i için, artık gerekli değil)
+      # Ama vexa-lite başlarken hata vermemesi için bırakıyoruz
+      REMOTE_TRANSCRIPTION_ENABLED: "true"
+      TRANSCRIBER_URL: http://assemblyai-proxy:8070/v1/audio/transcriptions
+      TRANSCRIBER_API_KEY: ${ASSEMBLYAI_API_KEY}
+      REMOTE_TRANSCRIBER_URL: http://assemblyai-proxy:8070/v1/audio/transcriptions
+      REMOTE_TRANSCRIBER_API_KEY: ${ASSEMBLYAI_API_KEY}
+      REMOTE_TRANSCRIBER_MODEL: best
+      REMOTE_TRANSCRIBER_TEMPERATURE: "0"
+      REMOTE_TRANSCRIBER_LANGUAGE: en
+
+      LOG_LEVEL: info
+      PORT: 8056
+      NODE_ENV: production
+    depends_on:
+      - postgres
+      - redis
+      - assemblyai-proxy
+    restart: unless-stopped
+    networks:
+      - vexa-network
+
+  # AssemblyAI Proxy (fallback — WhisperLive'ın remote backend'i kullanıyorsa devrede)
+  assemblyai-proxy:
+    build:
+      context: ./assemblyai-proxy
+      dockerfile: Dockerfile
+    container_name: vexa-assemblyai-proxy
+    ports:
+      - "8070:8070"
+    environment:
+      ASSEMBLYAI_API_KEY: ${ASSEMBLYAI_API_KEY}
+      ASSEMBLYAI_SPEECH_MODEL: best
+      MIN_CHUNK_SECONDS: "5"
+      IDLE_FLUSH_SECONDS: "4"
+      MIN_FLUSH_SECONDS: "1.5"
+    restart: unless-stopped
+    networks:
+      - vexa-network
+
+  # Ashera Transkript UI
+  ashera-ui:
+    build:
+      context: ./ashera-ui
+      dockerfile: Dockerfile
+    container_name: ashera-ui
+    ports:
+      - "3000:3000"
+    environment:
+      VEXA_URL: http://vexa-lite:8056
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-your-super-secret-admin-token-here}
+    depends_on:
+      - vexa-lite
+    restart: unless-stopped
+    networks:
+      - vexa-network
+
+  # Cloudflare Tunnel — ücretsiz internet erişimi
+  # Başlatmak için: docker-compose --profile tunnel up -d
+  cloudflare-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: ashera-tunnel
+    command: tunnel --url http://ashera-ui:3000
+    profiles:
+      - tunnel
+    depends_on:
+      - ashera-ui
+    restart: unless-stopped
+    networks:
+      - vexa-network
+
+  call-receiver:
+    build: ./call-receiver
+    ports:
+      - "8075:8075"
+    environment:
+      DATABASE_URL: postgresql://vexa:vexa-secure-password-change-this@postgres:5432/vexa
+      ASSEMBLYAI_PROXY_URL: http://assemblyai-proxy:8070
+      ALOTECH_POLL_INTERVAL: "60"
+      CREDENTIALS_ENCRYPTION_KEY: ${CREDENTIALS_ENCRYPTION_KEY:-changeme-generate-with-openssl-rand-hex-32}
+    depends_on:
+      - postgres
+      - assemblyai-proxy
+    restart: unless-stopped
+    networks:
+      - vexa-network
+
+  slack-bot:
+    build: ./slack-bot
+    ports:
+      - "8076:8076"
+    environment:
+      DATABASE_URL: postgresql://vexa:vexa-secure-password-change-this@postgres:5432/vexa
+      VEXA_LITE_URL: http://vexa-lite:8056
+      SLACK_CLIENT_ID: ${SLACK_CLIENT_ID}
+      SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
+      SLACK_REDIRECT_URI: ${SLACK_REDIRECT_URI}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      PORT: "8076"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - vexa-network
+
+volumes:
+  vexa_pgdata:
+    driver: local
+
+networks:
+  vexa-network:
+    driver: bridge
