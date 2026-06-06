@@ -94,11 +94,11 @@ function buildHelpBlocks() {
       text: {
         type: 'mrkdwn',
         text: `*Ashera Commands*\n\n` +
-          `\`/ashera rapor\` — Send last meeting report\n` +
-          `\`/ashera hazırla\` — Pre-meeting preparation brief\n` +
-          `\`/ashera yardım\` — This help message\n\n` +
+          `\`/ashera report\` — Send last meeting report\n` +
+          `\`/ashera prepare\` — Pre-meeting preparation brief\n` +
+          `\`/ashera help\` — This help message\n\n` +
           `*CRM Commands (natural language)*\n` +
-          `\`/ashera crm bağla\` — Connect to HubSpot\n` +
+          `\`/ashera crm connect\` — Connect to HubSpot\n` +
           `\`/ashera crm <any command>\` — Examples:\n` +
           `  • \`/ashera crm find TechCorp deal\`\n` +
           `  • \`/ashera crm update deal stage to Proposal\`\n` +

@@ -19,9 +19,9 @@ async function handleCommand(request, reply) {
         return
       }
 
-      if (subcommand === 'rapor') {
+      if (subcommand === 'rapor' || subcommand === 'report') {
         await handleRapor(user_id, team_id, installation.bot_token)
-      } else if (subcommand === 'hazırla' || subcommand === 'hazirla') {
+      } else if (subcommand === 'hazırla' || subcommand === 'hazirla' || subcommand === 'prepare') {
         await handleHazirla(user_id, team_id, installation.bot_token)
       } else if (subcommand.startsWith('crm')) {
         await handleCrm(user_id, team_id, text, installation.bot_token)
@@ -44,14 +44,14 @@ async function handleRapor(slackUserId, workspaceId, botToken) {
   const segments = await db.getTranscriptSegments(meeting.id)
   const report = await generatePostMeetingReport(segments, meeting.data || {})
   const blocks = buildPostMeetingBlocks(report, meeting.id)
-  await sendDM(botToken, slackUserId, blocks, `Toplantı raporu: ${report.company}`)
+  await sendDM(botToken, slackUserId, blocks, `Meeting report: ${report.company}`)
 }
 
 async function handleHazirla(slackUserId, workspaceId, botToken) {
   const meeting = await db.getRecentMeetingForUser(slackUserId)
   const segments = meeting ? await db.getTranscriptSegments(meeting.id) : []
   const report = await generatePreMeetingReport(segments, {})
-  const companyName = meeting?.data?.company || 'Yaklaşan Toplantı'
+  const companyName = meeting?.data?.company || 'Upcoming Meeting'
   const blocks = buildPreMeetingBlocks(report, companyName)
   await sendDM(botToken, slackUserId, blocks, 'Your pre-meeting brief is ready.')
 }
@@ -64,9 +64,9 @@ async function handleYardim(slackUserId, botToken) {
 async function handleCrm(slackUserId, workspaceId, fullText, botToken) {
   const crmCommand = (fullText || '').replace(/^crm\s*/i, '').trim()
 
-  if (!crmCommand || crmCommand.toLowerCase() === 'bağla') {
+  if (!crmCommand || crmCommand.toLowerCase() === 'bağla' || crmCommand.toLowerCase() === 'connect') {
     const connectUrl = `http://localhost:8076/crm/oauth/install?slack_user_id=${slackUserId}&workspace_id=${workspaceId}`
-    await sendDM(botToken, slackUserId, [], `HubSpot'a bağlanmak için: ${connectUrl}`)
+    await sendDM(botToken, slackUserId, [], `To connect to HubSpot: ${connectUrl}`)
     return
   }
 
