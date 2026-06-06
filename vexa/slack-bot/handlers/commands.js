@@ -8,7 +8,7 @@ async function handleCommand(request, reply) {
   const subcommand = (text || '').trim().toLowerCase()
 
   // Always respond within 3 seconds
-  reply.status(200).send({ response_type: 'ephemeral', text: '⏳ Hazırlanıyor...' })
+  reply.status(200).send({ response_type: 'ephemeral', text: '⏳ Preparing...' })
 
   // Process in background
   setImmediate(async () => {
@@ -37,7 +37,7 @@ async function handleCommand(request, reply) {
 async function handleRapor(slackUserId, workspaceId, botToken) {
   const meeting = await db.getRecentMeetingForUser(slackUserId)
   if (!meeting) {
-    await sendDM(botToken, slackUserId, [], 'Tamamlanmış toplantı bulunamadı. Önce bir toplantıya katılın.')
+    await sendDM(botToken, slackUserId, [], 'No completed meeting found. Join a meeting first.')
     return
   }
 
@@ -53,12 +53,12 @@ async function handleHazirla(slackUserId, workspaceId, botToken) {
   const report = await generatePreMeetingReport(segments, {})
   const companyName = meeting?.data?.company || 'Yaklaşan Toplantı'
   const blocks = buildPreMeetingBlocks(report, companyName)
-  await sendDM(botToken, slackUserId, blocks, 'Toplantı hazırlık brifiniz hazır.')
+  await sendDM(botToken, slackUserId, blocks, 'Your pre-meeting brief is ready.')
 }
 
 async function handleYardim(slackUserId, botToken) {
   const blocks = buildHelpBlocks()
-  await sendDM(botToken, slackUserId, blocks, 'Ashera komutları')
+  await sendDM(botToken, slackUserId, blocks, 'Ashera commands')
 }
 
 async function handleCrm(slackUserId, workspaceId, fullText, botToken) {

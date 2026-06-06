@@ -5,15 +5,15 @@ const client = new Anthropic({ apiKey: config.anthropic.apiKey })
 
 function segmentsToText(segments) {
   return segments
-    .map(s => `${s.speaker || 'Konuşmacı'}: ${s.text}`)
+    .map(s => `${s.speaker || 'Speaker'}: ${s.text}`)
     .join('\n')
 }
 
 async function generatePostMeetingReport(segments, meetingData = {}) {
   if (!segments || segments.length === 0) {
     return {
-      company: meetingData.company || 'Bilinmiyor',
-      summary: 'Transkript henüz hazır değil.',
+      company: meetingData.company || 'Unknown',
+      summary: 'Transcript not ready yet.',
       actions: [],
       signals: [],
       dealScore: 50,
@@ -25,29 +25,29 @@ async function generatePostMeetingReport(segments, meetingData = {}) {
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 800,
-    system: `Sen Ashera'sın, bir satış zekası asistanı.
-Verilen satış görüşmesi transkriptinden Türkçe bir toplantı sonrası rapor üret.
+    system: `You are Ashera, a sales intelligence assistant.
+Generate a post-meeting report from the given sales call transcript.
 
-Çıktı formatı — sadece JSON, başka hiçbir şey yazma:
+Output format — JSON only, nothing else:
 {
-  "company": "şirket adı veya 'Bilinmiyor'",
-  "summary": "2-3 cümle özet",
+  "company": "company name or 'Unknown'",
+  "summary": "2-3 sentence summary",
   "actions": [
-    { "text": "aksiyon maddesi", "deadline": "tarih veya null" }
+    { "text": "action item", "deadline": "date or null" }
   ],
   "signals": [
-    { "type": "positive|neutral|negative", "text": "sinyal açıklaması" }
+    { "type": "positive|neutral|negative", "text": "signal description" }
   ],
   "dealScore": 0-100
 }
 
-Kurallar:
-- Özet maksimum 3 cümle
-- Maksimum 5 aksiyon maddesi
-- Maksimum 4 sinyal
-- Deal skoru: alım sinyalleri artırır, itirazlar azaltır, başlangıç 50
-- Türkçe yaz
-- Sadece JSON çıktısı ver, markdown veya açıklama ekleme`,
+Rules:
+- Summary maximum 3 sentences
+- Maximum 5 action items
+- Maximum 4 signals
+- Deal score: buying signals increase it, objections decrease it, start at 50
+- Write in English
+- Output only JSON, no markdown or explanation`,
     messages: [{ role: 'user', content: transcriptText }],
   })
 
@@ -56,7 +56,7 @@ Kurallar:
     return JSON.parse(text)
   } catch {
     return {
-      company: 'Bilinmiyor',
+      company: 'Unknown',
       summary: text.slice(0, 200),
       actions: [],
       signals: [],
@@ -68,27 +68,27 @@ Kurallar:
 async function generatePreMeetingReport(previousSegments, context = {}) {
   const transcriptText = previousSegments.length > 0
     ? segmentsToText(previousSegments)
-    : 'Önceki görüşme transkripti yok.'
+    : 'No previous meeting transcript available.'
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 500,
-    system: `Sen Ashera'sın, bir satış zekası asistanı.
-Verilen önceki toplantı transkriptinden toplantı öncesi hazırlık brifingi üret.
+    system: `You are Ashera, a sales intelligence assistant.
+Generate a pre-meeting preparation brief from the given previous meeting transcript.
 
-Çıktı formatı — sadece JSON:
+Output format — JSON only:
 {
-  "warnings": ["dikkat edilecek madde 1", "madde 2"],
-  "preparation": ["hazırlık notu 1", "not 2"],
-  "context": "1-2 cümle genel bağlam"
+  "warnings": ["watch out item 1", "item 2"],
+  "preparation": ["preparation note 1", "note 2"],
+  "context": "1-2 sentence general context"
 }
 
-Kurallar:
-- Maksimum 3 uyarı
-- Maksimum 4 hazırlık notu
-- Kısa ve aksiyon odaklı yaz
-- Türkçe yaz
-- Sadece JSON çıktısı ver`,
+Rules:
+- Maximum 3 warnings
+- Maximum 4 preparation notes
+- Keep it short and action-oriented
+- Write in English
+- Output only JSON`,
     messages: [{ role: 'user', content: transcriptText }],
   })
 
@@ -98,8 +98,8 @@ Kurallar:
   } catch {
     return {
       warnings: [],
-      preparation: ['Önceki görüşme verisi analiz edilemedi.'],
-      context: 'Hazırlık verisi mevcut değil.',
+      preparation: ['Previous meeting data could not be analyzed.'],
+      context: 'No preparation data available.',
     }
   }
 }

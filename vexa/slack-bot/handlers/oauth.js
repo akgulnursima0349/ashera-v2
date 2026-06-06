@@ -14,7 +14,16 @@ async function handleCallback(request, reply) {
   const { code, error } = request.query
 
   if (error || !code) {
-    return reply.status(400).send('<html><body><h2>Bağlantı başarısız.</h2></body></html>')
+    return reply.type('text/html; charset=utf-8').send(`
+      <html>
+      <head><meta charset="UTF-8"></head>
+      <body style="font-family:sans-serif;text-align:center;padding:60px;background:#0e0e11;color:#fff">
+        <h2>❌ Connection failed.</h2>
+        <p style="color:#ff6b6b">Could not connect to Slack.</p>
+        <p style="color:#888">You can close this window.</p>
+      </body>
+      </html>
+    `)
   }
 
   const params = new URLSearchParams({
@@ -31,7 +40,15 @@ async function handleCallback(request, reply) {
 
   if (!data.ok) {
     console.error('Slack OAuth error:', data.error)
-    return reply.status(400).send('<html><body><h2>OAuth hatası: ' + data.error + '</h2></body></html>')
+    return reply.type('text/html; charset=utf-8').send(`
+      <html>
+      <head><meta charset="UTF-8"></head>
+      <body style="font-family:sans-serif;text-align:center;padding:60px;background:#0e0e11;color:#fff">
+        <h2>❌ OAuth error: ${data.error}</h2>
+        <p style="color:#888">You can close this window and try again.</p>
+      </body>
+      </html>
+    `)
   }
 
   await db.saveInstallation({
@@ -41,12 +58,13 @@ async function handleCallback(request, reply) {
     botToken: data.access_token,
   })
 
-  return reply.type('text/html').send(`
+  return reply.type('text/html; charset=utf-8').send(`
     <html>
-    <body style="font-family:sans-serif;text-align:center;padding:60px;background:#0e0e11;color:#fff;">
-      <h2>✅ Ashera Slack'e bağlandı!</h2>
-      <p>${data.team.name} workspace'ine başarıyla kuruldu.</p>
-      <p style="color:#5DCAA5">Bu pencereyi kapatabilirsiniz.</p>
+    <head><meta charset="UTF-8"></head>
+    <body style="font-family:sans-serif;text-align:center;padding:60px;background:#0e0e11;color:#fff">
+      <h2>✅ Ashera connected to Slack!</h2>
+      <p>Successfully installed to your workspace.</p>
+      <p style="color:#5DCAA5">You can close this window.</p>
     </body>
     </html>
   `)

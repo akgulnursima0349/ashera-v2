@@ -28,7 +28,7 @@ async function handleMeetingEnded(request, reply) {
       const report = await generatePostMeetingReport(segments)
       const blocks = buildPostMeetingBlocks(report, meeting_id)
 
-      await sendDM(installation.bot_token, link.slack_user_id, blocks, `Toplantı raporu: ${report.company}`)
+      await sendDM(installation.bot_token, link.slack_user_id, blocks, `Meeting report: ${report.company}`)
       await db.markNotified(meeting_id)
 
       console.log(`Post-meeting DM sent for meeting ${meeting_id} to ${link.slack_user_id}`)

@@ -6,49 +6,49 @@ function buildPostMeetingBlocks(report, meetingId) {
 
   const actionsText = report.actions.length > 0
     ? report.actions.map(a => `☐ ${a.text}${a.deadline ? ` — ${a.deadline}` : ''}`).join('\n')
-    : 'Aksiyon maddesi tespit edilmedi.'
+    : 'No action items detected.'
 
   const signalsText = report.signals.length > 0
     ? report.signals.map(s => `${signalEmojis[s.type] || '⚪'} ${s.text}`).join('\n')
-    : 'Sinyal tespit edilmedi.'
+    : 'No signals detected.'
 
   return [
     {
       type: 'header',
-      text: { type: 'plain_text', text: `📋 Toplantı Raporu — ${report.company}` }
+      text: { type: 'plain_text', text: `📋 Meeting Report — ${report.company}` }
     },
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `*ÖZET*\n${report.summary}` }
-    },
-    { type: 'divider' },
-    {
-      type: 'section',
-      text: { type: 'mrkdwn', text: `*AKSİYONLAR*\n${actionsText}` }
+      text: { type: 'mrkdwn', text: `*SUMMARY*\n${report.summary}` }
     },
     { type: 'divider' },
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `*SATIŞ SİNYALLERİ*\n${signalsText}` }
+      text: { type: 'mrkdwn', text: `*ACTIONS*\n${actionsText}` }
     },
     { type: 'divider' },
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `*Deal skoru:* ${scoreEmoji} ${report.dealScore}/100` }
+      text: { type: 'mrkdwn', text: `*SALES SIGNALS*\n${signalsText}` }
+    },
+    { type: 'divider' },
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*Deal score:* ${scoreEmoji} ${report.dealScore}/100` }
     },
     {
       type: 'actions',
       elements: [
         {
           type: 'button',
-          text: { type: 'plain_text', text: "CRM'e Aktar" },
+          text: { type: 'plain_text', text: 'Transfer to CRM' },
           action_id: 'crm_transfer',
           value: String(meetingId),
           style: 'primary',
         },
         {
           type: 'button',
-          text: { type: 'plain_text', text: 'Transkripti Gör' },
+          text: { type: 'plain_text', text: 'View Transcript' },
           action_id: 'view_transcript',
           value: String(meetingId),
         },
@@ -60,25 +60,25 @@ function buildPostMeetingBlocks(report, meetingId) {
 function buildPreMeetingBlocks(report, companyName) {
   const warningsText = report.warnings.length > 0
     ? report.warnings.map(w => `⚠️ ${w}`).join('\n')
-    : 'Özel uyarı yok.'
+    : 'No special warnings.'
 
   const prepText = report.preparation.length > 0
     ? report.preparation.map(p => `• ${p}`).join('\n')
-    : 'Hazırlık notu yok.'
+    : 'No preparation notes.'
 
   return [
     {
       type: 'header',
-      text: { type: 'plain_text', text: `🎯 Toplantı Hazırlık Brifiniz — ${companyName}` }
+      text: { type: 'plain_text', text: `🎯 Pre-Meeting Brief — ${companyName}` }
     },
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `*DİKKAT EDİLECEKLER*\n${warningsText}` }
+      text: { type: 'mrkdwn', text: `*WATCH OUT*\n${warningsText}` }
     },
     { type: 'divider' },
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `*HAZIRLIK NOTLARI*\n${prepText}` }
+      text: { type: 'mrkdwn', text: `*PREPARATION NOTES*\n${prepText}` }
     },
     {
       type: 'section',
@@ -93,24 +93,24 @@ function buildHelpBlocks() {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Ashera Komutları*\n\n` +
-          `\`/ashera rapor\` — Son toplantının raporunu gönderir\n` +
-          `\`/ashera hazırla\` — Toplantı öncesi hazırlık brifingi\n` +
-          `\`/ashera yardım\` — Bu yardım mesajı\n\n` +
-          `*CRM Komutları (doğal dil)*\n` +
-          `\`/ashera crm bağla\` — HubSpot'a bağlan\n` +
-          `\`/ashera crm <herhangi bir komut>\` — Örnekler:\n` +
-          `  • \`/ashera crm TechCorp dealını bul\`\n` +
-          `  • \`/ashera crm deal stage güncelle Proposal\`\n` +
-          `  • \`/ashera crm not ekle "SSO sorunu konuşuldu"\`\n` +
-          `  • \`/ashera crm son toplantıyı kaydet\`\n` +
-          `  • \`/ashera crm contact oluştur Can Demir, TechCorp CTO\``
+        text: `*Ashera Commands*\n\n` +
+          `\`/ashera rapor\` — Send last meeting report\n` +
+          `\`/ashera hazırla\` — Pre-meeting preparation brief\n` +
+          `\`/ashera yardım\` — This help message\n\n` +
+          `*CRM Commands (natural language)*\n` +
+          `\`/ashera crm bağla\` — Connect to HubSpot\n` +
+          `\`/ashera crm <any command>\` — Examples:\n` +
+          `  • \`/ashera crm find TechCorp deal\`\n` +
+          `  • \`/ashera crm update deal stage to Proposal\`\n` +
+          `  • \`/ashera crm add note "SSO issue discussed"\`\n` +
+          `  • \`/ashera crm save last meeting\`\n` +
+          `  • \`/ashera crm create contact John Smith, TechCorp CTO\``
       }
     }
   ]
 }
 
-async function sendDM(token, slackUserId, blocks, text = 'Ashera raporu') {
+async function sendDM(token, slackUserId, blocks, text = 'Ashera report') {
   const client = new WebClient(token)
 
   const { channel } = await client.conversations.open({ users: slackUserId })
