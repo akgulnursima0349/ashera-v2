@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, screen, session, desktopCapturer } = requir
 const path = require('path')
 const fs = require('fs')
 
+
 let mainWindow = null
 let overlayWindow = null
 let transcriptPoller = null

@@ -3,7 +3,7 @@ const WebSocket = require('ws')
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY
 const DEEPGRAM_URL = 'wss://api.deepgram.com/v1/listen?' + new URLSearchParams({
   model: 'nova-2',
-  detect_language: 'true',
+  language: 'multi',
   diarize: 'true',
   punctuate: 'true',
   smart_format: 'true',
@@ -93,14 +93,8 @@ function startStreaming(sid, dbMeetingId, onSegment) {
 
 function addChunk(arrayBuffer) {
   if (dgSocket && dgSocket.readyState === WebSocket.OPEN) {
-    // arrayBuffer is Float32 PCM from Web Audio API — convert to Int16
-    const float32 = new Float32Array(arrayBuffer)
-    const int16 = new Int16Array(float32.length)
-    for (let i = 0; i < float32.length; i++) {
-      const s = Math.max(-1, Math.min(1, float32[i]))
-      int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
-    }
-    dgSocket.send(Buffer.from(int16.buffer))
+    // arrayBuffer is already Int16 PCM — pcm-processor.js converts Float32→Int16 before sending
+    dgSocket.send(Buffer.from(arrayBuffer))
   }
 }
 
