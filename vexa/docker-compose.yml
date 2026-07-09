@@ -36,7 +36,7 @@ services:
       - "9090:9090"
     environment:
       ASSEMBLYAI_API_KEY: ${ASSEMBLYAI_API_KEY}
-      REDIS_URL: redis://vexa-lite:6379/0
+      REDIS_URL: redis://redis:6379/0
       REDIS_STREAM_KEY: transcription_segments
       REDIS_SPEAKER_EVENTS_RELATIVE_STREAM_KEY: speaker_events_relative
     restart: unless-stopped
@@ -148,12 +148,30 @@ services:
       - "8075:8075"
     environment:
       DATABASE_URL: postgresql://vexa:vexa-secure-password-change-this@postgres:5432/vexa
-      ASSEMBLYAI_PROXY_URL: http://assemblyai-proxy:8070
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY}
       ALOTECH_POLL_INTERVAL: "60"
       CREDENTIALS_ENCRYPTION_KEY: ${CREDENTIALS_ENCRYPTION_KEY:-changeme-generate-with-openssl-rand-hex-32}
     depends_on:
       - postgres
       - assemblyai-proxy
+    restart: unless-stopped
+    networks:
+      - vexa-network
+
+  teams-bot:
+    build: ./teams-bot
+    container_name: vexa-teams-bot
+    ports:
+      - "8077:8077"
+    environment:
+      ASSEMBLYAI_API_KEY: ${ASSEMBLYAI_API_KEY}
+      BACKEND_URL: http://vexa-lite:8056
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://vexa:vexa-secure-password-change-this@postgres:5432/vexa
+      PORT: "8077"
+    depends_on:
+      - redis
+      - postgres
     restart: unless-stopped
     networks:
       - vexa-network
