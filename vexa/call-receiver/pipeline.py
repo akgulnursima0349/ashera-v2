@@ -1,12 +1,51 @@
 import logging
+import os
 
-import httpx
+from deepgram import DeepgramClient, PrerecordedOptions
 
-from config import ASSEMBLYAI_PROXY_URL
 from db import create_meeting_record, update_meeting_status, save_transcription_segments
 from normalizer import NormalizedCall
 
 log = logging.getLogger(__name__)
+
+DEEPGRAM_API_KEY = os.environ.get('DEEPGRAM_API_KEY')
+
+
+async def transcribe_call_recording(recording_url: str) -> list[dict]:
+    """Download recording and transcribe with Deepgram."""
+    deepgram = DeepgramClient(DEEPGRAM_API_KEY)
+
+    options = PrerecordedOptions(
+        model='nova-2',
+        detect_language=True,
+        diarize=True,
+        punctuate=True,
+        smart_format=True,
+        filler_words=False,
+        utterances=True,
+    )
+
+    # Use URL source directly (Deepgram can fetch the URL itself)
+    source = {'url': recording_url}
+
+    response = deepgram.listen.prerecorded.v('1').transcribe_url(source, options)
+    result = response.to_dict()
+
+    segments = []
+    utterances = result.get('results', {}).get('utterances', [])
+
+    for utt in utterances:
+        segments.append({
+            'speaker': f"Speaker {utt.get('speaker', 0) + 1}",
+            'text': utt.get('transcript', '').strip(),
+            'start_time': utt.get('start', 0),
+            'end_time': utt.get('end', 0),
+            'language': result.get('results', {})
+                .get('channels', [{}])[0]
+                .get('detected_language', 'tr'),
+        })
+
+    return segments
 
 
 async def submit_call(call: NormalizedCall) -> None:
@@ -14,54 +53,19 @@ async def submit_call(call: NormalizedCall) -> None:
     log.info("Created meeting record id=%d for call %s (provider=%s).", meeting_id, call.call_id, call.provider)
 
     try:
-        await update_meeting_status(meeting_id, "processing")
+        await update_meeting_status(meeting_id, 'processing')
 
-        audio_bytes = await _download_audio(call.recording_url)
-        log.info("Downloaded %d bytes of audio for call %s.", len(audio_bytes), call.call_id)
+        # Transcribe with Deepgram
+        segments = await transcribe_call_recording(call.recording_url)
+        log.info("Transcribed %d segment(s) for call %s.", len(segments), call.call_id)
 
-        result = await _send_to_proxy(audio_bytes)
-        log.info("Proxy returned %d segment(s) for call %s.", len(result.get("segments", [])), call.call_id)
+        # Save segments to database
+        await save_transcription_segments(meeting_id, segments)
 
-        language = result.get("language", "tr")
-        await save_transcription_segments(meeting_id, result.get("segments", []), language)
+        await update_meeting_status(meeting_id, 'completed')
+        print(f'[Call receiver] Transcribed {len(segments)} segments for meeting {meeting_id}')
 
-        await update_meeting_status(meeting_id, "completed")
-
-    except Exception as exc:
-        log.error("Pipeline failed for call %s (meeting_id=%d): %s", call.call_id, meeting_id, exc)
-        await update_meeting_status(meeting_id, "failed")
+    except Exception as e:
+        log.error("Pipeline failed for call %s (meeting_id=%d): %s", call.call_id, meeting_id, e)
+        await update_meeting_status(meeting_id, 'failed')
         raise
-
-
-async def _download_audio(url: str) -> bytes:
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        return response.content
-
-
-async def _send_to_proxy(audio_bytes: bytes) -> dict:
-    """
-    POST audio to assemblyai-proxy /v1/audio/transcriptions.
-
-    Endpoint discovered from assemblyai-proxy/main.py:
-      POST /v1/audio/transcriptions
-      Multipart form fields:
-        file     — UploadFile (the audio data)
-        language — Optional[str]  (language code, e.g. "tr")
-        model    — str            (default "best")
-    Returns JSON: { "text": str, "language": str, "duration": float, "segments": [...] }
-    """
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        files = {"file": ("recording.mp3", audio_bytes, "audio/mpeg")}
-        data = {
-            "model": "best",
-            "language": "tr",   # default; can be extended later
-        }
-        response = await client.post(
-            f"{ASSEMBLYAI_PROXY_URL}/v1/audio/transcriptions",
-            files=files,
-            data=data,
-        )
-        response.raise_for_status()
-        return response.json()

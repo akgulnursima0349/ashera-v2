@@ -2,6 +2,7 @@
   "name": "ashera-desktop",
   "version": "1.0.0",
   "description": "Ashera Desktop — Live Sales Briefing",
+  "author": "Ashera",
   "main": "main.js",
   "scripts": {
     "build": "webpack",
@@ -12,7 +13,8 @@
     "dotenv": "^16.4.5",
     "electron-store": "^8.2.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "ws": "^8.14.0"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

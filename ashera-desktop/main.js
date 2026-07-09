@@ -1,11 +1,88 @@
 require('dotenv').config()
 
-const { app, BrowserWindow, ipcMain, screen, session } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, session, desktopCapturer } = require('electron')
 const path = require('path')
+const fs = require('fs')
 
 let mainWindow = null
 let overlayWindow = null
 let transcriptPoller = null
+
+const audioStreamer = require('./services/audioStreamer')
+const { startWatcher } = require('./services/calendarWatcher')
+const { startPolling } = require('./services/transcriptPoller')
+
+const TEAMS_BOT_URL = process.env.TEAMS_BOT_URL || 'http://3.120.15.106:8077'
+
+// --- Local session storage ---
+
+function getSessionsDir() {
+  return path.join(app.getPath('userData'), 'sessions')
+}
+
+function ensureSessionsDir() {
+  const dir = getSessionsDir()
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+function saveSession(sessionId, segments, startTime) {
+  try {
+    const dir = ensureSessionsDir()
+    const session = {
+      id: sessionId,
+      platform: 'desktop_audio',
+      start_time: startTime,
+      end_time: new Date().toISOString(),
+      segments,
+    }
+    fs.writeFileSync(path.join(dir, `${sessionId}.json`), JSON.stringify(session, null, 2))
+    console.log(`Session saved: ${sessionId} (${segments.length} segments)`)
+  } catch (err) {
+    console.error('Failed to save session:', err.message)
+  }
+}
+
+function listSessions() {
+  try {
+    const dir = ensureSessionsDir()
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'))
+    const sessions = files.map(file => {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))
+        return {
+          id: data.id,
+          platform: data.platform,
+          start_time: data.start_time,
+          end_time: data.end_time,
+          segment_count: (data.segments || []).length,
+        }
+      } catch { return null }
+    }).filter(Boolean)
+    // Sort by start_time descending
+    sessions.sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
+    return sessions
+  } catch (err) {
+    console.error('Failed to list sessions:', err.message)
+    return []
+  }
+}
+
+function getSession(sessionId) {
+  try {
+    const file = path.join(ensureSessionsDir(), `${sessionId}.json`)
+    if (!fs.existsSync(file)) return null
+    return JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch (err) {
+    console.error('Failed to read session:', err.message)
+    return null
+  }
+}
+
+ipcMain.handle('sessions:list', () => listSessions())
+ipcMain.handle('sessions:get', (_, sessionId) => getSession(sessionId))
+
+// ---
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -19,7 +96,6 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      webviewTag: true,
       preload: path.join(__dirname, 'preload.js'),
     }
   })
@@ -65,39 +141,156 @@ function createOverlayWindow() {
   }, 2000)
 }
 
-// IPC handlers
-ipcMain.on('meeting:join', async (event, { url }) => {
-  const meetingId = extractMeetingId(url)
-  createOverlayWindow()
 
+async function startTeamsBotSession(meetingUrl) {
   try {
-    // Start bot on backend
-    const response = await fetch('http://localhost:8056/bots', {
+    mainWindow.webContents.send('audio:status', 'joining')
+    createOverlayWindow()
+
+    const res = await fetch(`${TEAMS_BOT_URL}/bots`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        meeting_url: url,
-        platform: 'google_meet',
-        native_meeting_id: meetingId,
-        bot_name: 'Ashera Bot',
-        language: 'tr',
+        meeting_url: meetingUrl,
+        bot_name: 'Ashera',
+        native_meeting_id: extractTeamsMeetingId(meetingUrl),
       })
     })
 
-    if (response.ok) {
-      // Start polling for transcripts
-      const { startPolling } = require('./services/transcriptPoller')
-      transcriptPoller = startPolling(meetingId, (segments) => {
-        generateBrief(segments, meetingId)
-      })
+    if (!res.ok) throw new Error(`Teams bot error: ${res.status}`)
+    const data = await res.json()
+    const meetingId = data.meeting_id
 
-      // Notify overlay to start timer
-      overlayWindow.webContents.send('meeting:start')
-    }
+    mainWindow.webContents.send('meeting:active', {
+      sessionId: meetingId,
+      platform: 'teams',
+    })
+
+    overlayWindow.webContents.once('did-finish-load', () => {
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send('meeting:start')
+      }
+    })
+
+    // Poll Teams bot for transcripts
+    transcriptPoller = startPolling(meetingId, null, (segments) => {
+      generateBrief(segments, meetingId)
+    }, 'teams')
+
   } catch (err) {
-    console.error('Failed to start meeting bot:', err)
+    console.error('Teams bot start error:', err.message)
+    mainWindow.webContents.send('audio:status', 'error')
+    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.destroy()
+  }
+}
+
+function extractTeamsMeetingId(url) {
+  const match = url.match(/meet\/(\d+)/)
+  return match ? match[1] : Date.now().toString()
+}
+
+// --- Audio capture IPC ---
+
+// Per-session segment accumulator
+let currentSessionId = null
+let currentSessionStart = null
+let accumulatedSegments = []
+let pendingCaptureLanguage = 'en'
+
+ipcMain.on('capture:start', async (event, data) => {
+  const platform = data?.platform || 'audio'
+  const meetingUrl = data?.meetingUrl || null
+  pendingCaptureLanguage = data?.language || 'en'
+
+  if (platform === 'teams' && meetingUrl) {
+    await startTeamsBotSession(meetingUrl)
+  } else {
+    mainWindow.webContents.send('audio:permission:request')
   }
 })
+
+ipcMain.on('audio:started', async (event) => {
+  try {
+    const sessionId = `desktop-${Date.now()}`
+    currentSessionId = sessionId
+    currentSessionStart = new Date().toISOString()
+    accumulatedSegments = []
+
+    // Start streaming immediately so chunks aren't lost during async meeting record creation
+    audioStreamer.startStreaming(sessionId, null, (segments) => {
+      // Accumulate segments for later saving
+      accumulatedSegments.push(...segments)
+      generateBrief(segments, sessionId)
+    }, pendingCaptureLanguage)
+
+    createOverlayWindow()
+
+    mainWindow.webContents.send('meeting:active', {
+      sessionId,
+      meetingId: null,
+    })
+
+    // Wait for overlay page to load before sending meeting:start
+    overlayWindow.webContents.once('did-finish-load', () => {
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send('meeting:start')
+      }
+    })
+
+    // Attempt to create a meeting record in the background; non-fatal if endpoint doesn't exist
+    const vexaUrl = process.env.VEXA_URL || 'http://3.120.15.106:8056'
+    fetch(`${vexaUrl}/meetings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        platform: 'desktop_audio',
+        platform_specific_id: sessionId,
+        status: 'active',
+      })
+    }).then(async (response) => {
+      // meeting record created; meeting_id not needed for Deepgram streaming
+    }).catch(() => { /* endpoint may not exist — continue */ })
+
+  } catch (err) {
+    console.error('Failed to start audio session:', err.message)
+    mainWindow.webContents.send('audio:status', 'error')
+  }
+})
+
+ipcMain.on('audio:chunk', (event, arrayBuffer) => {
+  audioStreamer.addChunk(arrayBuffer)
+})
+
+ipcMain.on('audio:error', (event, message) => {
+  console.error('Audio capture error from renderer:', message)
+  mainWindow.webContents.send('audio:status', 'error')
+})
+
+async function finishSession() {
+  // stopStreaming sends CloseStream and returns any buffered segments synchronously
+  audioStreamer.stopStreaming()
+  if (transcriptPoller) { transcriptPoller(); transcriptPoller = null }
+  if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.destroy()
+
+  // Save accumulated segments to disk
+  if (currentSessionId && accumulatedSegments.length > 0) {
+    saveSession(currentSessionId, accumulatedSegments, currentSessionStart)
+  }
+  currentSessionId = null
+  currentSessionStart = null
+  accumulatedSegments = []
+}
+
+ipcMain.on('audio:ended', (event) => {
+  // Stream ended (user stopped sharing from OS dialog)
+  finishSession()
+})
+
+ipcMain.on('capture:stop', (event) => {
+  finishSession()
+})
+
+// --- Overlay handlers ---
 
 ipcMain.on('overlay:close', () => {
   if (overlayWindow) {
@@ -116,12 +309,22 @@ ipcMain.on('overlay:height', (event, height) => {
 ipcMain.on('api:connect', async (event, { provider }) => {
   if (provider === 'calendar') {
     const { shell } = require('electron')
-    shell.openExternal('http://localhost:8076/calendar/oauth/install?slack_user_id=PLACEHOLDER&workspace_id=PLACEHOLDER')
+    shell.openExternal('https://api.ashera.net/calendar/oauth/install?slack_user_id=PLACEHOLDER&workspace_id=PLACEHOLDER')
     return
   }
   if (provider === 'crm') {
     const { shell } = require('electron')
-    shell.openExternal('http://localhost:8076/crm/oauth/install?slack_user_id=PLACEHOLDER&workspace_id=PLACEHOLDER')
+    shell.openExternal('https://api.ashera.net/crm/oauth/install?slack_user_id=PLACEHOLDER&workspace_id=PLACEHOLDER')
+    return
+  }
+  if (provider === 'slack') {
+    const { shell } = require('electron')
+    shell.openExternal('https://api.ashera.net/slack/oauth/install?redirect_uri=https://api.ashera.net/slack/oauth/callback')
+    return
+  }
+  if (provider === 'teams') {
+    const { shell } = require('electron')
+    shell.openExternal('https://api.ashera.net/teams/oauth/install')
     return
   }
   console.log('Connect requested:', provider)
@@ -130,23 +333,30 @@ ipcMain.on('api:connect', async (event, { provider }) => {
 async function generateBrief(segments, meetingId) {
   const { generateBrief: gen } = require('./services/briefGenerator')
   const brief = await gen(segments)
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
+  if (brief && overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send('brief:update', brief)
   }
 }
 
-function extractMeetingId(url) {
-  const match = url.match(/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/)
-  return match ? match[1] : url.split('/').pop()
-}
-
-// Allow microphone for Google Meet webview
 app.whenReady().then(() => {
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    if (permission === 'media') return callback(true)
-    callback(false)
+  // Allow getDisplayMedia in renderer — required in Electron 28+
+  // Windows: 'loopback' captures system audio without showing a picker dialog
+  // Mac/Linux: fall back to screen picker (user selects source and enables "Share audio")
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
+      const audio = process.platform === 'win32' ? 'loopback' : true
+      callback({ video: sources[0], audio })
+    }).catch(err => {
+      console.error('desktopCapturer error:', err.message)
+      callback({})
+    })
   })
+
   createMainWindow()
+  // Start calendar watcher after window loads
+  setTimeout(() => {
+    startWatcher(mainWindow, 'PLACEHOLDER_USER_ID', 'PLACEHOLDER_WORKSPACE_ID')
+  }, 3000)
 })
 
 app.on('window-all-closed', () => {

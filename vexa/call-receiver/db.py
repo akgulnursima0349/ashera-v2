@@ -113,19 +113,19 @@ async def update_meeting_status(meeting_id: int, status: str):
     )
 
 
-async def save_transcription_segments(meeting_id: int, segments: list, language: str):
-    """Write transcript segments returned by assemblyai-proxy into the transcriptions table."""
+async def save_transcription_segments(meeting_id: int, segments: list, language: str = 'tr'):
+    """Write transcript segments from Deepgram into the transcriptions table."""
     if not segments:
         return
     pool = await get_pool()
     rows = [
         (
             meeting_id,
-            "Speaker",          # proxy does not return speaker diarization for phone calls
+            seg.get("speaker", "Speaker"),
             seg.get("text", "").strip(),
-            float(seg.get("start", 0.0)),
-            float(seg.get("end", 0.0)),
-            language,
+            float(seg.get("start_time", seg.get("start", 0.0))),
+            float(seg.get("end_time", seg.get("end", 0.0))),
+            seg.get("language", language),
         )
         for seg in segments
         if seg.get("text", "").strip()
