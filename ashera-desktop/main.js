@@ -104,6 +104,12 @@ function createMainWindow() {
 }
 
 function createOverlayWindow() {
+  // Destroy any existing overlay before creating a new one
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.destroy()
+    overlayWindow = null
+  }
+
   const display = screen.getDisplayNearestPoint({
     x: mainWindow.getBounds().x,
     y: mainWindow.getBounds().y,
@@ -196,12 +202,13 @@ function extractTeamsMeetingId(url) {
 let currentSessionId = null
 let currentSessionStart = null
 let accumulatedSegments = []
-let pendingCaptureLanguage = 'en'
+let briefInterval = null
+let pendingCaptureLanguage = 'tr'
 
 ipcMain.on('capture:start', async (event, data) => {
   const platform = data?.platform || 'audio'
   const meetingUrl = data?.meetingUrl || null
-  pendingCaptureLanguage = data?.language || 'en'
+  pendingCaptureLanguage = data?.language || 'tr'
 
   if (platform === 'teams' && meetingUrl) {
     await startTeamsBotSession(meetingUrl)
@@ -217,12 +224,25 @@ ipcMain.on('audio:started', async (event) => {
     currentSessionStart = new Date().toISOString()
     accumulatedSegments = []
 
+    // Reset brief cooldown for new session
+    require('./services/briefGenerator').reset()
+
     // Start streaming immediately so chunks aren't lost during async meeting record creation
     audioStreamer.startStreaming(sessionId, null, (segments) => {
-      // Accumulate segments for later saving
       accumulatedSegments.push(...segments)
-      generateBrief(segments, sessionId)
+      // Trigger brief on every 5th segment
+      if (accumulatedSegments.length % 5 === 0) {
+        generateBrief(accumulatedSegments, sessionId)
+      }
     }, pendingCaptureLanguage)
+
+    // Also update brief every 30 seconds regardless of segment count
+    if (briefInterval) clearInterval(briefInterval)
+    briefInterval = setInterval(() => {
+      if (accumulatedSegments.length > 0) {
+        generateBrief(accumulatedSegments, sessionId)
+      }
+    }, 30000)
 
     createOverlayWindow()
 
@@ -268,14 +288,18 @@ ipcMain.on('audio:error', (event, message) => {
 })
 
 async function finishSession() {
-  // stopStreaming sends CloseStream and returns any buffered segments synchronously
+  if (briefInterval) { clearInterval(briefInterval); briefInterval = null }
   audioStreamer.stopStreaming()
   if (transcriptPoller) { transcriptPoller(); transcriptPoller = null }
   if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.destroy()
 
-  // Save accumulated segments to disk
-  if (currentSessionId && accumulatedSegments.length > 0) {
+  // Save session to disk (always save, even if no segments — preserves the time record)
+  console.log(`[session] finishSession: ${accumulatedSegments.length} segments for ${currentSessionId}`)
+  if (currentSessionId) {
     saveSession(currentSessionId, accumulatedSegments, currentSessionStart)
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('sessions:updated')
+    }
   }
   currentSessionId = null
   currentSessionStart = null
@@ -332,10 +356,32 @@ ipcMain.on('api:connect', async (event, { provider }) => {
 })
 
 async function generateBrief(segments, meetingId) {
+  console.log(`[brief] generateBrief called, segments: ${segments.length}, overlay: ${overlayWindow && !overlayWindow.isDestroyed()}`)
   const { generateBrief: gen } = require('./services/briefGenerator')
   const brief = await gen(segments)
-  if (brief && overlayWindow && !overlayWindow.isDestroyed()) {
+  console.log(`[brief] result: ${brief ? JSON.stringify(brief).slice(0, 80) : 'null (cooldown or error)'}`)
+  if (!brief) return
+
+  // Skip error/insufficient-context API responses
+  const errorKeywords = ['eksik', 'yetersiz', 'analiz edilemedi', 'paylaşın', 'bekleniyor', 'insufficient', 'transcript']
+  const allBriefText = (brief.briefs || []).map(b => b.text || '').join(' ').toLowerCase()
+  const allAlertText = (brief.alerts || []).map(a => a.text || '').join(' ').toLowerCase()
+  const isErrorResponse = errorKeywords.some(k => allBriefText.includes(k) || allAlertText.includes(k))
+  if (isErrorResponse) {
+    console.log('[brief] skipping error response:', allBriefText.slice(0, 60))
+    return
+  }
+
+  const hasRealContent = (brief.briefs && brief.briefs.length > 0) ||
+    (brief.alerts && brief.alerts.some(a => a.type !== 'neutral'))
+  if (!hasRealContent) {
+    console.log('[brief] skipping — no real content yet')
+    return
+  }
+
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send('brief:update', brief)
+    console.log('[brief] sent to overlay ✓')
   }
 }
 
@@ -351,6 +397,12 @@ app.whenReady().then(() => {
       console.error('desktopCapturer error:', err.message)
       callback({})
     })
+  })
+
+  // Allow microphone access for getUserMedia
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'media') return callback(true)
+    callback(false)
   })
 
   createMainWindow()

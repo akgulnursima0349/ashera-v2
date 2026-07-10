@@ -481,9 +481,12 @@ function TranscriptsScreen() {
   const [loading, setLoading] = useState(false)
   const [listLoading, setListLoading] = useState(true)
 
-  // Fetch meeting list on mount
+  // Fetch meeting list on mount and whenever a session is saved
   useEffect(() => {
     fetchMeetings()
+    if (window.appAPI?.onSessionsUpdated) {
+      window.appAPI.onSessionsUpdated(fetchMeetings)
+    }
   }, [])
 
   async function fetchMeetings() {

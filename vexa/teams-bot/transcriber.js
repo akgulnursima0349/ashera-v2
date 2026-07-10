@@ -2,7 +2,7 @@ const WebSocket = require('ws')
 
 const DEEPGRAM_URL = 'wss://api.deepgram.com/v1/listen?' + new URLSearchParams({
   model: 'nova-2',
-  detect_language: 'true',
+  language: 'multi',
   diarize: 'true',
   punctuate: 'true',
   smart_format: 'true',
