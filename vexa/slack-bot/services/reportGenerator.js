@@ -104,4 +104,68 @@ Rules:
   }
 }
 
-module.exports = { generatePostMeetingReport, generatePreMeetingReport }
+const MEETING_REPORT_SYSTEM_PROMPT = `Sen deneyimli bir satış analisti ve koçusun. Aşağıdaki satış görüşmesi transkriptinden profesyonel bir toplantı sonrası rapor üret.
+
+Raporda şunlar olsun:
+1. Şirket adını transkriptten çıkar
+2. Özet: ne konuşuldu, nereye varıldı (3-4 cümle, yöneticiye iletebilecek kalitede)
+3. Aksiyon maddeleri: kimin ne yapacağı, tarihi varsa tarihi (maksimum 5 madde)
+4. Satış sinyalleri: pozitif, negatif, dikkat edilmesi gerekenler
+5. Deal skoru ve gerekçesi
+6. Önerilen sonraki adım: satışçının hemen yapması gereken 1 şey
+
+Kurallar:
+- Transkriptte geçmeyen şeyleri uydurma
+- Aksiyon maddelerini kimin aldığını belirt (satışçı mı, müşteri mi)
+- Rakip ismi geçtiyse sinyaller bölümünde mutlaka belirt
+- Konuşma dili Türkçe ise Türkçe, İngilizce ise İngilizce yanıt ver
+- SADECE JSON çıktısı ver
+
+Çıktı formatı:
+{
+  "company": "şirket adı veya 'Bilinmiyor'",
+  "summary": "özet metni",
+  "actions": [{"owner": "Satışçı|Müşteri", "text": "aksiyon", "deadline": "tarih veya null"}],
+  "signals": [{"type": "positive|negative|neutral", "text": "sinyal açıklaması"}],
+  "dealScore": 0-100,
+  "dealScoreReason": "tek cümle gerekçe",
+  "nextStep": "satışçının hemen yapması gereken 1 şey"
+}`
+
+async function generateMeetingReport(transcriptText) {
+  if (!transcriptText || !transcriptText.trim()) {
+    return {
+      company: 'Bilinmiyor',
+      summary: 'Transkript bulunamadı.',
+      actions: [],
+      signals: [],
+      dealScore: 50,
+      dealScoreReason: 'Transkript yok.',
+      nextStep: 'Toplantı transkriptini yükleyin.',
+    }
+  }
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1200,
+    system: MEETING_REPORT_SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: transcriptText }],
+  })
+
+  const text = response.content[0].text.trim()
+  try {
+    return JSON.parse(text)
+  } catch {
+    return {
+      company: 'Bilinmiyor',
+      summary: text.slice(0, 500),
+      actions: [],
+      signals: [],
+      dealScore: 50,
+      dealScoreReason: 'JSON parse hatası.',
+      nextStep: 'Raporu manuel kontrol edin.',
+    }
+  }
+}
+
+module.exports = { generatePostMeetingReport, generatePreMeetingReport, generateMeetingReport }

@@ -7,13 +7,14 @@
     "dev": "node --watch main.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "@hubspot/api-client": "^11.0.0",
     "@slack/bolt": "^3.18.0",
     "@slack/web-api": "^7.3.0",
-    "@anthropic-ai/sdk": "^0.24.0",
-    "fastify": "^4.27.0",
-    "pg": "^8.11.0",
+    "botbuilder": "^4.23.3",
     "dotenv": "^16.4.0",
+    "fastify": "^4.27.0",
     "googleapis": "^140.0.0",
-    "@hubspot/api-client": "^11.0.0"
+    "pg": "^8.11.0"
   }
 }

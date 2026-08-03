@@ -11,6 +11,9 @@ module.exports = {
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY,
   },
+  deepgram: {
+    apiKey: process.env.DEEPGRAM_API_KEY,
+  },
   database: {
     url: process.env.DATABASE_URL,
   },
@@ -23,6 +26,10 @@ module.exports = {
     clientId: process.env.HUBSPOT_CLIENT_ID,
     clientSecret: process.env.HUBSPOT_CLIENT_SECRET,
     redirectUri: process.env.HUBSPOT_REDIRECT_URI || 'http://localhost:8076/crm/oauth/callback',
+  },
+  teams: {
+    appId: process.env.TEAMS_APP_ID,
+    appPassword: process.env.TEAMS_APP_PASSWORD,
   },
   vexaLiteUrl: process.env.VEXA_LITE_URL || 'http://localhost:8056',
   port: parseInt(process.env.PORT || '8076'),

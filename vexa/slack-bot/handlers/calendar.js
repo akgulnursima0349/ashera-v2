@@ -113,9 +113,34 @@ async function getUpcomingMeetings(installation) {
   return res.data.items || []
 }
 
+async function handleUpcoming(request, reply) {
+  const { slack_user_id, workspace_id } = request.query
+  if (!slack_user_id) return reply.status(400).send({ error: 'slack_user_id required' })
+
+  const installation = await db.getCalendarInstallation(slack_user_id)
+  if (!installation) return reply.send({ meetings: [] })
+
+  try {
+    const events = await getUpcomingMeetings(installation)
+
+    const meetings = events.map(e => ({
+      id: e.id,
+      title: e.summary || 'Meeting',
+      start: e.start.dateTime || e.start.date,
+      meetLink: e.hangoutLink || null,
+    }))
+
+    return reply.send({ meetings })
+  } catch (err) {
+    console.error('Upcoming meetings error:', err)
+    return reply.send({ meetings: [] })
+  }
+}
+
 module.exports = {
   handleCalendarInstall,
   handleCalendarCallback,
   handleCalendarStatus,
+  handleUpcoming,
   getUpcomingMeetings,
 }

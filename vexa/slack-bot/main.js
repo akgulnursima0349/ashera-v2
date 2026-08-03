@@ -9,8 +9,10 @@ const notify = require('./handlers/notify')
 const calendar = require('./handlers/calendar')
 const { startPollingLoop } = require('./services/calendarPoller')
 const crm = require('./handlers/crm')
+const teamsHandler = require('./handlers/teams')
+const meetings = require('./handlers/meetings')
 
-const fastify = Fastify({ logger: true })
+const fastify = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 })
 
 // Capture raw body for Slack signature verification
 fastify.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (req, body, done) => {
@@ -62,6 +64,7 @@ async function start() {
   fastify.get('/calendar/oauth/install', calendar.handleCalendarInstall)
   fastify.get('/calendar/oauth/callback', calendar.handleCalendarCallback)
   fastify.get('/calendar/installation/status', calendar.handleCalendarStatus)
+  fastify.get('/calendar/upcoming', calendar.handleUpcoming)
 
   // CRM OAuth routes
   fastify.get('/crm/oauth/install', crm.handleCrmInstall)
@@ -71,6 +74,18 @@ async function start() {
   // Internal endpoints (called by other Ashera services)
   fastify.post('/slack/notify/meeting-ended', notify.handleMeetingEnded)
   fastify.post('/slack/link-meeting', notify.handleLinkMeeting)
+
+  // Teams Bot Framework webhook
+  fastify.post('/teams/messages', async (request, reply) => {
+    await teamsHandler.handleTeamsMessage(request, reply)
+  })
+
+  // Meeting intelligence endpoints (desktop app)
+  fastify.post('/transcribe', meetings.handleTranscribe)
+  fastify.post('/brief', meetings.handleBrief)
+  fastify.post('/report', meetings.handleReport)
+  fastify.get('/reports', meetings.handleListReports)
+  fastify.get('/reports/:id', meetings.handleGetReport)
 
   // Health check
   fastify.get('/health', async () => ({ status: 'ok' }))

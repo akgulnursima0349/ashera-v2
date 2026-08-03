@@ -68,6 +68,22 @@ async function runMigrations() {
       is_active       BOOLEAN DEFAULT TRUE
     )
   `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS meeting_reports (
+      id              SERIAL PRIMARY KEY,
+      slack_user_id   VARCHAR(50),
+      workspace_id    VARCHAR(50),
+      company         VARCHAR(255),
+      summary         TEXT,
+      actions         JSONB DEFAULT '[]',
+      signals         JSONB DEFAULT '[]',
+      deal_score      INTEGER DEFAULT 50,
+      duration_mins   INTEGER,
+      platform        VARCHAR(50) DEFAULT 'desktop_audio',
+      created_at      TIMESTAMP DEFAULT NOW()
+    )
+  `)
 }
 
 async function saveInstallation({ workspaceId, workspaceName, userId, botToken }) {
@@ -213,6 +229,39 @@ async function updateCrmTokens(slackUserId, accessToken, tokenExpiry) {
   )
 }
 
+async function saveMeetingReport({ slackUserId, workspaceId, company, summary, actions, signals, dealScore, durationMins, platform }) {
+  const res = await pool.query(`
+    INSERT INTO meeting_reports
+      (slack_user_id, workspace_id, company, summary, actions, signals, deal_score, duration_mins, platform)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING *
+  `, [
+    slackUserId || null,
+    workspaceId || null,
+    company || 'Unknown',
+    summary || '',
+    JSON.stringify(actions || []),
+    JSON.stringify(signals || []),
+    typeof dealScore === 'number' ? dealScore : 50,
+    durationMins || null,
+    platform || 'desktop_audio',
+  ])
+  return res.rows[0]
+}
+
+async function getMeetingReportsByUser(slackUserId) {
+  const res = await pool.query(
+    'SELECT * FROM meeting_reports WHERE slack_user_id = $1 ORDER BY created_at DESC',
+    [slackUserId]
+  )
+  return res.rows
+}
+
+async function getMeetingReportById(id) {
+  const res = await pool.query('SELECT * FROM meeting_reports WHERE id = $1', [id])
+  return res.rows[0] || null
+}
+
 module.exports = {
   pool,
   runMigrations,
@@ -233,4 +282,7 @@ module.exports = {
   saveCrmInstallation,
   getCrmInstallation,
   updateCrmTokens,
+  saveMeetingReport,
+  getMeetingReportsByUser,
+  getMeetingReportById,
 }

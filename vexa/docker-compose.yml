@@ -142,6 +142,17 @@ services:
     networks:
       - vexa-network
 
+  deepgram-proxy:
+    build: ./deepgram-proxy
+    container_name: ashera-deepgram-proxy
+    ports:
+      - "9091:9091"
+    environment:
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY}
+    restart: unless-stopped
+    networks:
+      - vexa-network
+
   call-receiver:
     build: ./call-receiver
     ports:
@@ -189,6 +200,7 @@ services:
       SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
       SLACK_REDIRECT_URI: ${SLACK_REDIRECT_URI}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY}
       PORT: "8076"
     depends_on:
       - postgres
