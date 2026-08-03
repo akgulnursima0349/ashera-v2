@@ -1,5 +1,6 @@
 const Anthropic = require('@anthropic-ai/sdk')
 const config = require('../config')
+const { parseLlmJson } = require('./jsonParse')
 
 const client = new Anthropic({ apiKey: config.anthropic.apiKey })
 
@@ -42,7 +43,7 @@ async function generateLiveBrief(input) {
 
   const text = response.content[0].text.trim()
   try {
-    return JSON.parse(text)
+    return parseLlmJson(text)
   } catch {
     return { alerts: [], briefs: [], dealScore: 50 }
   }
